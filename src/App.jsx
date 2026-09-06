@@ -174,7 +174,7 @@ _Dibuat Oleh © Agustian._`;
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col">
       <header className="bg-white p-4 shadow-sm border-b border-slate-200 sticky top-0 z-10 flex justify-between items-center">
         <h1 className="text-xl lg:text-2xl font-bold text-slate-900">KasirKu</h1>
-        <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-3 py-1 rounded-full animate-pulse">● Live Cloud Sync</span>
+        <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-3 py-1 rounded-full animate-pulse">● Agustian</span>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-4 p-4 flex-grow">
