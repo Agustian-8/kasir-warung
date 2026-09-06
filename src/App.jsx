@@ -1,11 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
+import { useState, useEffect } from 'react';
 import { menuItems } from './data/menu';
 
 export default function App() {
   const [cart, setCart] = useState([]);
   const [activeKategori, setActiveKategori] = useState('Semua');
-  const rekapRef = useRef(null);
 
   const [totalPenjualan, setTotalPenjualan] = useState(() => Number(localStorage.getItem('kasir_penjualan')) || 0);
   const [pengeluaran, setPengeluaran] = useState(() => Number(localStorage.getItem('kasir_pengeluaran')) || 0);
@@ -48,7 +46,7 @@ export default function App() {
   };
 
   const resetRekapHarian = () => {
-    if(window.confirm('Yakin ingin mereset buku hari ini? Pastikan laporan sudah diunduh.')) {
+    if(window.confirm('Yakin ingin mereset buku hari ini? Pastikan laporan sudah dikirim ke WhatsApp.')) {
       setTotalPenjualan(0); 
       setPengeluaran(0);
       localStorage.removeItem('kasir_penjualan'); 
@@ -56,44 +54,42 @@ export default function App() {
     }
   };
 
-  const downloadRekapGambar = () => {
-    if (!rekapRef.current) {
-      alert("Bagian laporan tidak ditemukan.");
-      return;
-    }
-
-    setTimeout(() => {
-      html2canvas(rekapRef.current, { 
-        backgroundColor: '#ffffff', 
-        scale: 2,
-        useCORS: true,
-        logging: false
-      }).then((canvas) => {
-        const image = canvas.toDataURL("image/png");
-        const tanggal = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
-        
-        const link = document.createElement("a");
-        link.href = image;
-        link.download = `Laporan_Warung_${tanggal}.png`;
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }).catch((error) => {
-        console.error("Error html2canvas:", error);
-        alert("Gagal mengunduh gambar. Pastikan memori perangkat cukup dan coba lagi.");
-      });
-    }, 150);
-  };
-
-  // FUNGSI BARU: Format input pengeluaran agar muncul titik otomatis
   const handlePengeluaranChange = (e) => {
-    // Hanya izinkan angka (hapus semua karakter selain angka)
     const hanyaAngka = e.target.value.replace(/\D/g, '');
     setPengeluaran(Number(hanyaAngka));
   };
 
   const keuntunganBersih = totalPenjualan - pengeluaran;
+
+  // FUNGSI BARU: Kirim Laporan Langsung ke Nomor WA Anda
+  const bagikanLaporan = () => {
+    const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    
+    // Teks Laporan
+    const teksLaporan = 
+`*LAPORAN HARIAN WARUNG*
+Tanggal: ${tanggal}
+
+*Pemasukan:* Rp ${totalPenjualan.toLocaleString('id-ID')}
+*Pengeluaran:* Rp ${pengeluaran.toLocaleString('id-ID')}
+-------------------------
+*Laba Bersih: Rp ${keuntunganBersih.toLocaleString('id-ID')}*
+
+_Catatan dari sistem KasirKu_`;
+
+    // Mengubah nomor Anda ke format API WhatsApp (08 diganti jadi 628)
+    const nomorWA = "6289514215508";
+    
+    // Mengubah teks agar bisa dibaca oleh URL browser
+    const teksEncoded = encodeURIComponent(teksLaporan);
+    
+    // Membuat tautan langsung ke aplikasi WhatsApp
+    const linkWA = `https://wa.me/${nomorWA}?text=${teksEncoded}`;
+    
+    // Membuka WhatsApp di tab/aplikasi baru
+    window.open(linkWA, '_blank');
+  };
+
   const menuTampil = activeKategori === 'Semua' ? menuItems : menuItems.filter(m => m.type === activeKategori);
 
   return (
@@ -168,7 +164,7 @@ export default function App() {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center bg-slate-100 rounded-lg border border-slate-200">
                       <button onClick={() => kurangiQty(item.cartId)} className="w-8 h-8 text-slate-600 active:bg-slate-200 rounded-l-lg">-</button>
-                      <span className="w-8 text-center font-semibold text-sm">{item.qty}</span>
+                      <span className="w-8 text-center font-semibold text-sm flex items-center justify-center">{item.qty}</span>
                       <button onClick={() => tambahQty(item.cartId)} className="w-8 h-8 text-slate-600 active:bg-slate-200 rounded-r-lg">+</button>
                     </div>
                     <button onClick={() => hapusItem(item.cartId)} className="text-xs font-semibold text-red-500 p-2">Hapus</button>
@@ -196,7 +192,7 @@ export default function App() {
         {/* KANAN: LAPORAN */}
         <div className="w-full lg:w-80 flex flex-col gap-4">
           
-          <div ref={rekapRef} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <h3 className="font-bold text-slate-800 mb-4 text-center border-b border-slate-100 pb-3">Laporan Harian</h3>
             <div className="space-y-3">
               <div>
@@ -214,13 +210,10 @@ export default function App() {
                 </p>
               </div>
             </div>
-            <p className="text-center text-[10px] text-slate-400 mt-4">Tanggal: {new Date().toLocaleDateString('id-ID')}</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Input Pengeluaran</label>
-            
-            {/* PERUBAHAN INPUT ADA DI SINI */}
             <input 
               type="text" 
               inputMode="numeric"
@@ -229,18 +222,19 @@ export default function App() {
               className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 mb-4"
               placeholder="Rp 0"
             />
-
+            
             <button 
-              onClick={downloadRekapGambar} 
-              className="w-full mb-2 bg-slate-800 text-white py-3 rounded-lg font-bold text-sm active:bg-slate-700 transition"
+              onClick={bagikanLaporan} 
+              className="w-full mb-2 bg-[#25D366] hover:bg-[#128C7E] text-white py-3 rounded-lg font-bold text-sm active:bg-[#075E54] transition"
             >
-              Simpan Laporan
+              Kirim Otomatis ke WA
             </button>
+            
             <button 
               onClick={resetRekapHarian} 
               className="w-full py-3 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm active:bg-slate-50 transition"
             >
-              Tutup Buku
+              Tutup Buku (Reset Data)
             </button>
           </div>
 
