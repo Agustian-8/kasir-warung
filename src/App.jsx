@@ -1,15 +1,78 @@
 import { useState, useEffect } from 'react';
+import { supabase } from './supabase';
 import { menuItems } from './data/menu';
 
 export default function App() {
-  const [cart, setCart] = useState([]);
+  // Keranjang kini otomatis membaca memori HP agar tidak hilang saat refresh
+  const [cart, setCart] = useState(() => {
+    const savedCart = localStorage.getItem('kasir_cart_sementara');
+    return savedCart ? JSON.parse(savedCart) : [];
+  });
+  
   const [activeKategori, setActiveKategori] = useState('Semua');
 
-  const [totalPenjualan, setTotalPenjualan] = useState(() => Number(localStorage.getItem('kasir_penjualan')) || 0);
-  const [pengeluaran, setPengeluaran] = useState(() => Number(localStorage.getItem('kasir_pengeluaran')) || 0);
+  // State data dari database Cloud
+  const [totalPenjualan, setTotalPenjualan] = useState(0);
+  const [pengeluaran, setPengeluaran] = useState(0);
+  const [penyesuaian, setPenyesuaian] = useState(0);
 
-  useEffect(() => localStorage.setItem('kasir_penjualan', totalPenjualan), [totalPenjualan]);
-  useEffect(() => localStorage.setItem('kasir_pengeluaran', pengeluaran), [pengeluaran]);
+  // Simpan keranjang ke memori lokal setiap kali ada perubahan item
+  useEffect(() => {
+    localStorage.setItem('kasir_cart_sementara', JSON.stringify(cart));
+  }, [cart]);
+
+  // 1. Ambil data awal dari Supabase & Pasang Listener Real-time
+  useEffect(() => {
+    fetchData();
+
+    // Mendengarkan perubahan data secara langsung (Real-time)
+    const channel = supabase
+      .channel('public:rekap_harian')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rekap_harian' }, (payload) => {
+        setTotalPenjualan(payload.new.total_penjualan);
+        setPengeluaran(payload.new.pengeluaran);
+        setPenyesuaian(payload.new.penyesuaian);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchData = async () => {
+    const { data, error } = await supabase
+      .from('rekap_harian')
+      .select('*')
+      .eq('id', 1)
+      .single();
+    
+    if (data) {
+      setTotalPenjualan(data.total_penjualan);
+      setPengeluaran(data.pengeluaran);
+      setPenyesuaian(data.penyesuaian);
+    }
+  };
+
+  // Fungsi untuk menyimpan perubahan ke database Supabase
+  const updateDatabase = async (newData) => {
+    const payload = {
+      total_penjualan: totalPenjualan,
+      pengeluaran: pengeluaran,
+      penyesuaian: penyesuaian,
+      ...newData,
+      updated_at: new Date()
+    };
+
+    if (newData.total_penjualan !== undefined) setTotalPenjualan(newData.total_penjualan);
+    if (newData.pengeluaran !== undefined) setPengeluaran(newData.pengeluaran);
+    if (newData.penyesuaian !== undefined) setPenyesuaian(newData.penyesuaian);
+
+    await supabase
+      .from('rekap_harian')
+      .update(payload)
+      .eq('id', 1);
+  };
 
   const addToCart = (item, qty = 1, withEgg = false) => {
     const basePrice = withEgg ? item.price + item.addon : item.price;
@@ -41,52 +104,55 @@ export default function App() {
 
   const prosesPembayaran = () => {
     if (cart.length === 0) return;
-    setTotalPenjualan(prev => prev + totalKeranjang);
-    setCart([]);
+    const penjualanBaru = totalPenjualan + totalKeranjang;
+    updateDatabase({ total_penjualan: penjualanBaru });
+    setCart([]); // Kosongkan keranjang setelah dibayar
+    localStorage.removeItem('kasir_cart_sementara'); // Hapus memori sementara keranjang
   };
 
   const resetRekapHarian = () => {
     if(window.confirm('Yakin ingin mereset buku hari ini? Pastikan laporan sudah dikirim ke WhatsApp.')) {
-      setTotalPenjualan(0); 
-      setPengeluaran(0);
-      localStorage.removeItem('kasir_penjualan'); 
-      localStorage.removeItem('kasir_pengeluaran');
+      updateDatabase({ total_penjualan: 0, pengeluaran: 0, penyesuaian: 0 });
     }
   };
 
   const handlePengeluaranChange = (e) => {
-    const hanyaAngka = e.target.value.replace(/\D/g, '');
-    setPengeluaran(Number(hanyaAngka));
+    const hanyaAngka = Number(e.target.value.replace(/\D/g, ''));
+    updateDatabase({ pengeluaran: hanyaAngka });
   };
 
-  const keuntunganBersih = totalPenjualan - pengeluaran;
+  const handlePenyesuaianChange = (e) => {
+    const hanyaAngka = Number(e.target.value.replace(/\D/g, ''));
+    updateDatabase({ penyesuaian: hanyaAngka });
+  };
 
-  // FUNGSI BARU: Kirim Laporan Langsung ke Nomor WA Anda
+  const totalPemasukanAkhir = totalPenjualan + penyesuaian;
+  const keuntunganBersih = totalPemasukanAkhir - pengeluaran;
+
   const bagikanLaporan = () => {
     const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
-    // Teks Laporan
     const teksLaporan = 
 `*LAPORAN HARIAN WARUNG*
-Tanggal: ${tanggal}
+${tanggal}
 
-*Pemasukan:* Rp ${totalPenjualan.toLocaleString('id-ID')}
-*Pengeluaran:* Rp ${pengeluaran.toLocaleString('id-ID')}
--------------------------
-*Laba Bersih: Rp ${keuntunganBersih.toLocaleString('id-ID')}*
+*PEMASUKAN*
+Penjualan        : Rp ${totalPenjualan.toLocaleString('id-ID')}
+Penyesuaian      : Rp ${penyesuaian.toLocaleString('id-ID')}
+*Total Kas Masuk : Rp ${totalPemasukanAkhir.toLocaleString('id-ID')}*
 
-_Catatan dari sistem KasirKu_`;
+*PENGELUARAN*
+Total Pengeluaran: Rp ${pengeluaran.toLocaleString('id-ID')}
 
-    // Mengubah nomor Anda ke format API WhatsApp (08 diganti jadi 628)
+━━━━━━━━━━━━━━━━━━
+*KEUNTUNGAN BERSIH*
+*Rp ${keuntunganBersih.toLocaleString('id-ID')}*
+━━━━━━━━━━━━━━━━━━
+
+_Dibuat oleh © Agustian._`;
+
     const nomorWA = "6289514215508";
-    
-    // Mengubah teks agar bisa dibaca oleh URL browser
-    const teksEncoded = encodeURIComponent(teksLaporan);
-    
-    // Membuat tautan langsung ke aplikasi WhatsApp
-    const linkWA = `https://wa.me/${nomorWA}?text=${teksEncoded}`;
-    
-    // Membuka WhatsApp di tab/aplikasi baru
+    const linkWA = `https://wa.me/${nomorWA}?text=${encodeURIComponent(teksLaporan)}`;
     window.open(linkWA, '_blank');
   };
 
@@ -94,8 +160,9 @@ _Catatan dari sistem KasirKu_`;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col">
-      <header className="bg-white p-4 shadow-sm border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-white p-4 shadow-sm border-b border-slate-200 sticky top-0 z-10 flex justify-between items-center">
         <h1 className="text-xl lg:text-2xl font-bold text-slate-900">KasirKu</h1>
+        <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-3 py-1 rounded-full animate-pulse">● Live Cloud Sync</span>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-4 p-4 flex-grow">
@@ -189,23 +256,31 @@ _Catatan dari sistem KasirKu_`;
           </div>
         </div>
 
-        {/* KANAN: LAPORAN */}
+        {/* KANAN: LAPORAN & INPUT MANUAL */}
         <div className="w-full lg:w-80 flex flex-col gap-4">
           
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <h3 className="font-bold text-slate-800 mb-4 text-center border-b border-slate-100 pb-3">Laporan Harian</h3>
             <div className="space-y-3">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase">Pemasukan</p>
-                <p className="text-lg font-bold text-slate-800">Rp {totalPenjualan.toLocaleString('id-ID')}</p>
+              <div className="flex justify-between items-center">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Total Penjualan</p>
+                <p className="text-sm font-bold text-slate-800">Rp {totalPenjualan.toLocaleString('id-ID')}</p>
               </div>
-              <div>
+              <div className="flex justify-between items-center">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Uang Tambahan</p>
+                <p className="text-sm font-bold text-indigo-600">+ Rp {penyesuaian.toLocaleString('id-ID')}</p>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+                <p className="text-xs font-bold text-slate-700 uppercase">TOTAL KAS MASUK</p>
+                <p className="text-lg font-black text-emerald-600">Rp {totalPemasukanAkhir.toLocaleString('id-ID')}</p>
+              </div>
+              <div className="flex justify-between items-center pt-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase">Pengeluaran</p>
-                <p className="text-lg font-bold text-slate-800">Rp {pengeluaran.toLocaleString('id-ID')}</p>
+                <p className="text-sm font-bold text-rose-500">- Rp {pengeluaran.toLocaleString('id-ID')}</p>
               </div>
-              <div className="pt-3 border-t border-slate-100">
-                <p className="text-xs font-semibold text-slate-500 uppercase">Laba Bersih</p>
-                <p className={`text-xl font-bold ${keuntunganBersih >= 0 ? 'text-indigo-600' : 'text-red-500'}`}>
+              <div className="pt-3 border-t-2 border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase text-center mb-1">Laba Bersih</p>
+                <p className={`text-2xl text-center font-black ${keuntunganBersih >= 0 ? 'text-indigo-600' : 'text-rose-500'}`}>
                   Rp {keuntunganBersih.toLocaleString('id-ID')}
                 </p>
               </div>
@@ -213,13 +288,23 @@ _Catatan dari sistem KasirKu_`;
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Input Pengeluaran</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Uang Tambahan / Lupa Input</label>
+            <input 
+              type="text" 
+              inputMode="numeric"
+              value={penyesuaian ? penyesuaian.toLocaleString('id-ID') : ''}
+              onChange={handlePenyesuaianChange}
+              className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 mb-4"
+              placeholder="Rp 0"
+            />
+
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Total Pengeluaran</label>
             <input 
               type="text" 
               inputMode="numeric"
               value={pengeluaran ? pengeluaran.toLocaleString('id-ID') : ''}
               onChange={handlePengeluaranChange}
-              className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 mb-4"
+              className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 mb-5"
               placeholder="Rp 0"
             />
             
