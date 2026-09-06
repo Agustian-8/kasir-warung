@@ -3,7 +3,6 @@ import { supabase } from './supabase';
 import { menuItems } from './data/menu';
 
 export default function App() {
-  // Keranjang kini otomatis membaca memori HP agar tidak hilang saat refresh
   const [cart, setCart] = useState(() => {
     const savedCart = localStorage.getItem('kasir_cart_sementara');
     return savedCart ? JSON.parse(savedCart) : [];
@@ -14,24 +13,20 @@ export default function App() {
   // State data dari database Cloud
   const [totalPenjualan, setTotalPenjualan] = useState(0);
   const [pengeluaran, setPengeluaran] = useState(0);
-  const [penyesuaian, setPenyesuaian] = useState(0);
+  const [uangFisikLaci, setUangFisikLaci] = useState(0);
 
-  // Simpan keranjang ke memori lokal setiap kali ada perubahan item
   useEffect(() => {
     localStorage.setItem('kasir_cart_sementara', JSON.stringify(cart));
   }, [cart]);
 
-  // 1. Ambil data awal dari Supabase & Pasang Listener Real-time
   useEffect(() => {
     fetchData();
 
-    // Mendengarkan perubahan data secara langsung (Real-time)
     const channel = supabase
       .channel('public:rekap_harian')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rekap_harian' }, (payload) => {
+        // Update hanya jika data dari server berbeda, agar tidak mengganggu ketikan aktif
         setTotalPenjualan(payload.new.total_penjualan);
-        setPengeluaran(payload.new.pengeluaran);
-        setPenyesuaian(payload.new.penyesuaian);
       })
       .subscribe();
 
@@ -41,7 +36,7 @@ export default function App() {
   }, []);
 
   const fetchData = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('rekap_harian')
       .select('*')
       .eq('id', 1)
@@ -49,28 +44,19 @@ export default function App() {
     
     if (data) {
       setTotalPenjualan(data.total_penjualan);
-      setPengeluaran(data.pengeluaran);
-      setPenyesuaian(data.penyesuaian);
+      setPengeluaran(data.pengeluaran || 0);
+      setUangFisikLaci(data.penyesuaian || 0);
     }
   };
 
-  // Fungsi untuk menyimpan perubahan ke database Supabase
-  const updateDatabase = async (newData) => {
-    const payload = {
-      total_penjualan: totalPenjualan,
-      pengeluaran: pengeluaran,
-      penyesuaian: penyesuaian,
-      ...newData,
-      updated_at: new Date()
-    };
-
-    if (newData.total_penjualan !== undefined) setTotalPenjualan(newData.total_penjualan);
-    if (newData.pengeluaran !== undefined) setPengeluaran(newData.pengeluaran);
-    if (newData.penyesuaian !== undefined) setPenyesuaian(newData.penyesuaian);
-
+  // Fungsi simpan universal ke database
+  const updateDatabase = async (dataBaru) => {
     await supabase
       .from('rekap_harian')
-      .update(payload)
+      .update({
+        ...dataBaru,
+        updated_at: new Date()
+      })
       .eq('id', 1);
   };
 
@@ -102,32 +88,60 @@ export default function App() {
 
   const totalKeranjang = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
-  const prosesPembayaran = () => {
+  const prosesPembayaran = async () => {
     if (cart.length === 0) return;
     const penjualanBaru = totalPenjualan + totalKeranjang;
-    updateDatabase({ total_penjualan: penjualanBaru });
-    setCart([]); // Kosongkan keranjang setelah dibayar
-    localStorage.removeItem('kasir_cart_sementara'); // Hapus memori sementara keranjang
+    setTotalPenjualan(penjualanBaru);
+    setCart([]);
+    localStorage.removeItem('kasir_cart_sementara');
+
+    await updateDatabase({ 
+      total_penjualan: penjualanBaru, 
+      pengeluaran: pengeluaran, 
+      penyesuaian: uangFisikLaci 
+    });
   };
 
-  const resetRekapHarian = () => {
+  const resetRekapHarian = async () => {
     if(window.confirm('Yakin ingin mereset buku hari ini? Pastikan laporan sudah dikirim ke WhatsApp.')) {
-      updateDatabase({ total_penjualan: 0, pengeluaran: 0, penyesuaian: 0 });
+      setTotalPenjualan(0);
+      setPengeluaran(0);
+      setUangFisikLaci(0);
+      await updateDatabase({ total_penjualan: 0, pengeluaran: 0, penyesuaian: 0 });
     }
   };
 
+  // Handler Pengeluaran (Lokal mulus, simpan saat selesai / onBlur)
   const handlePengeluaranChange = (e) => {
     const hanyaAngka = Number(e.target.value.replace(/\D/g, ''));
-    updateDatabase({ pengeluaran: hanyaAngka });
+    setPengeluaran(hanyaAngka);
   };
 
-  const handlePenyesuaianChange = (e) => {
+  const simpanPengeluaranServer = () => {
+    updateDatabase({ 
+      total_penjualan: totalPenjualan, 
+      pengeluaran: pengeluaran, 
+      penyesuaian: uangFisikLaci 
+    });
+  };
+
+  // Handler Uang Fisik Laci (Lokal mulus, simpan saat selesai / onBlur)
+  const handleUangFisikChange = (e) => {
     const hanyaAngka = Number(e.target.value.replace(/\D/g, ''));
-    updateDatabase({ penyesuaian: hanyaAngka });
+    setUangFisikLaci(hanyaAngka);
   };
 
-  const totalPemasukanAkhir = totalPenjualan + penyesuaian;
-  const keuntunganBersih = totalPemasukanAkhir - pengeluaran;
+  const simpanUangFisikServer = () => {
+    updateDatabase({ 
+      total_penjualan: totalPenjualan, 
+      pengeluaran: pengeluaran, 
+      penyesuaian: uangFisikLaci 
+    });
+  };
+
+  const kasAktifFisik = uangFisikLaci > 0 ? uangFisikLaci : totalPenjualan;
+  const selisihKas = kasAktifFisik - totalPenjualan;
+  const keuntunganBersih = kasAktifFisik - pengeluaran;
 
   const bagikanLaporan = () => {
     const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -136,20 +150,18 @@ export default function App() {
 `*LAPORAN HARIAN WARUNG*
 ${tanggal}
 
-*PEMASUKAN*
-Penjualan        : Rp ${totalPenjualan.toLocaleString('id-ID')}
-Penyesuaian      : Rp ${penyesuaian.toLocaleString('id-ID')}
-*Total Kas Masuk : Rp ${totalPemasukanAkhir.toLocaleString('id-ID')}*
+*TOTAL PENJUALAN* : Rp ${totalPenjualan.toLocaleString('id-ID')}
+*UANG DI LACI* : Rp ${kasAktifFisik.toLocaleString('id-ID')}
+*SELISIH / KAS*     : ${selisihKas >= 0 ? '+ Rp ' + selisihKas.toLocaleString('id-ID') : '- Rp ' + Math.abs(selisihKas).toLocaleString('id-ID')}
 
-*PENGELUARAN*
-Total Pengeluaran: Rp ${pengeluaran.toLocaleString('id-ID')}
+*TOTAL PENGELUARAN*        : Rp ${pengeluaran.toLocaleString('id-ID')}
 
 ━━━━━━━━━━━━━━━━━━
-*KEUNTUNGAN BERSIH*
+*LABA BERSIH*
 *Rp ${keuntunganBersih.toLocaleString('id-ID')}*
 ━━━━━━━━━━━━━━━━━━
 
-_Dibuat oleh © Agustian._`;
+_Dibuat Oleh © Agustian._`;
 
     const nomorWA = "6289514215508";
     const linkWA = `https://wa.me/${nomorWA}?text=${encodeURIComponent(teksLaporan)}`;
@@ -256,7 +268,7 @@ _Dibuat oleh © Agustian._`;
           </div>
         </div>
 
-        {/* KANAN: LAPORAN & INPUT MANUAL */}
+        {/* KANAN: LAPORAN & INPUT FISIK */}
         <div className="w-full lg:w-80 flex flex-col gap-4">
           
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
@@ -267,15 +279,17 @@ _Dibuat oleh © Agustian._`;
                 <p className="text-sm font-bold text-slate-800">Rp {totalPenjualan.toLocaleString('id-ID')}</p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="text-xs font-semibold text-slate-500 uppercase">Uang Tambahan</p>
-                <p className="text-sm font-bold text-indigo-600">+ Rp {penyesuaian.toLocaleString('id-ID')}</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase">Uang Di Laci</p>
+                <p className="text-sm font-bold text-indigo-600">Rp {kasAktifFisik.toLocaleString('id-ID')}</p>
               </div>
-              <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
-                <p className="text-xs font-bold text-slate-700 uppercase">TOTAL KAS MASUK</p>
-                <p className="text-lg font-black text-emerald-600">Rp {totalPemasukanAkhir.toLocaleString('id-ID')}</p>
+              <div className="flex justify-between items-center">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Selisih</p>
+                <p className={`text-sm font-bold ${selisihKas >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                  {selisihKas >= 0 ? `+${selisihKas.toLocaleString('id-ID')}` : selisihKas.toLocaleString('id-ID')}
+                </p>
               </div>
-              <div className="flex justify-between items-center pt-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase">Pengeluaran</p>
+              <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Total Pengeluaran</p>
                 <p className="text-sm font-bold text-rose-500">- Rp {pengeluaran.toLocaleString('id-ID')}</p>
               </div>
               <div className="pt-3 border-t-2 border-slate-100">
@@ -288,12 +302,13 @@ _Dibuat oleh © Agustian._`;
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <label className="block text-sm font-semibold text-slate-700 mb-1">Uang Tambahan / Lupa Input</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Total Uang Di Laci</label>
             <input 
               type="text" 
               inputMode="numeric"
-              value={penyesuaian ? penyesuaian.toLocaleString('id-ID') : ''}
-              onChange={handlePenyesuaianChange}
+              value={uangFisikLaci ? uangFisikLaci.toLocaleString('id-ID') : ''}
+              onChange={handleUangFisikChange}
+              onBlur={simpanUangFisikServer}
               className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 mb-4"
               placeholder="Rp 0"
             />
@@ -304,6 +319,7 @@ _Dibuat oleh © Agustian._`;
               inputMode="numeric"
               value={pengeluaran ? pengeluaran.toLocaleString('id-ID') : ''}
               onChange={handlePengeluaranChange}
+              onBlur={simpanPengeluaranServer}
               className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 mb-5"
               placeholder="Rp 0"
             />
