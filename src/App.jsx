@@ -41,6 +41,10 @@ export default function App() {
       .channel('public:rekap_harian')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rekap_harian' }, (payload) => {
         setTotalPenjualan(payload.new.total_penjualan);
+        // SINKRONISASI REAL-TIME UNTUK PENGELUARAN
+        if (payload.new.rincian_pengeluaran) {
+          setRincianPengeluaran(payload.new.rincian_pengeluaran);
+        }
       })
       .subscribe();
 
@@ -59,6 +63,10 @@ export default function App() {
     if (data) {
       setTotalPenjualan(data.total_penjualan);
       setUangFisikLaci(data.penyesuaian === 0 ? '' : data.penyesuaian);
+      // TARIK RINCIAN PENGELUARAN DARI DATABASE SAAT AWAL LOAD
+      if (data.rincian_pengeluaran) {
+        setRincianPengeluaran(data.rincian_pengeluaran);
+      }
     }
   };
 
@@ -117,7 +125,13 @@ export default function App() {
       setRincianPengeluaran([]);
       setUangFisikLaci('');
       localStorage.removeItem('kasir_rincian_pengeluaran');
-      await updateDatabase({ total_penjualan: 0, pengeluaran: 0, penyesuaian: 0 });
+      // KOSONGKAN JUGA KOLOM RINCIAN DI DATABASE
+      await updateDatabase({ 
+        total_penjualan: 0, 
+        pengeluaran: 0, 
+        penyesuaian: 0,
+        rincian_pengeluaran: []
+      });
     }
   };
 
@@ -137,14 +151,24 @@ export default function App() {
     setInputNominalPengeluaran('');
 
     const totalBaru = rincianBaru.reduce((sum, item) => sum + item.nominal, 0);
-    updateDatabase({ pengeluaran: totalBaru });
+    
+    // KIRIM JUGA DATA JSON-NYA KE DATABASE
+    updateDatabase({ 
+      pengeluaran: totalBaru,
+      rincian_pengeluaran: rincianBaru 
+    });
   };
 
   const hapusPengeluaran = (id) => {
     const rincianBaru = rincianPengeluaran.filter(p => p.id !== id);
     setRincianPengeluaran(rincianBaru);
     const totalBaru = rincianBaru.reduce((sum, item) => sum + item.nominal, 0);
-    updateDatabase({ pengeluaran: totalBaru });
+    
+    // UPDATE JUGA DATA JSON-NYA KE DATABASE SETELAH DIHAPUS
+    updateDatabase({ 
+      pengeluaran: totalBaru,
+      rincian_pengeluaran: rincianBaru 
+    });
   };
 
   // === FUNGSI: UANG LACI & KALKULASI AKHIR ===
