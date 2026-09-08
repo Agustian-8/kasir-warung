@@ -3,18 +3,18 @@ import { supabase } from './supabase';
 import { menuItems } from './data/menu';
 
 export default function App() {
+  // === STATE: KERANJANG & KATEGORI ===
   const [cart, setCart] = useState(() => {
     const savedCart = localStorage.getItem('kasir_cart_sementara');
     return savedCart ? JSON.parse(savedCart) : [];
   });
-  
   const [activeKategori, setActiveKategori] = useState('Semua');
 
-  // State data dari database Cloud
+  // === STATE: DATA DATABASE (REKAP HARIAN) ===
   const [totalPenjualan, setTotalPenjualan] = useState(0);
-  const [uangFisikLaci, setUangFisikLaci] = useState(''); // Diset string kosong agar default tidak 0 di input
+  const [uangFisikLaci, setUangFisikLaci] = useState(''); // String kosong agar input tidak default 0
 
-  // State Rincian Pengeluaran
+  // === STATE: PENGELUARAN ===
   const [rincianPengeluaran, setRincianPengeluaran] = useState(() => {
     const saved = localStorage.getItem('kasir_rincian_pengeluaran');
     return saved ? JSON.parse(saved) : [];
@@ -22,9 +22,9 @@ export default function App() {
   const [inputNamaPengeluaran, setInputNamaPengeluaran] = useState('');
   const [inputNominalPengeluaran, setInputNominalPengeluaran] = useState('');
 
-  // Total pengeluaran dikalkulasi otomatis dari rincian
   const totalPengeluaran = rincianPengeluaran.reduce((sum, item) => sum + item.nominal, 0);
 
+  // === EFFECT: SIMPAN LOKAL & SINKRONISASI DATABASE ===
   useEffect(() => {
     localStorage.setItem('kasir_cart_sementara', JSON.stringify(cart));
   }, [cart]);
@@ -36,6 +36,7 @@ export default function App() {
   useEffect(() => {
     fetchData();
 
+    // Listener realtime untuk update otomatis dari device lain
     const channel = supabase
       .channel('public:rekap_harian')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rekap_harian' }, (payload) => {
@@ -57,7 +58,7 @@ export default function App() {
     
     if (data) {
       setTotalPenjualan(data.total_penjualan);
-      setUangFisikLaci(data.penyesuaian === 0 ? '' : data.penyesuaian); // Handle nilai awal
+      setUangFisikLaci(data.penyesuaian === 0 ? '' : data.penyesuaian);
     }
   };
 
@@ -71,7 +72,7 @@ export default function App() {
       .eq('id', 1);
   };
 
-  // Fungsi tambah ke keranjang dengan varian harga
+  // === FUNGSI: MANAJEMEN KERANJANG ===
   const addToCart = (item, qty = 1, variantName = '', additionalPrice = 0) => {
     const basePrice = item.price + additionalPrice;
     const itemName = variantName ? `${item.name} ${variantName}` : item.name;
@@ -94,9 +95,11 @@ export default function App() {
 
   const totalKeranjang = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
+  // === FUNGSI: TRANSAKSI & RESET ===
   const prosesPembayaran = async () => {
     if (cart.length === 0) return;
     const penjualanBaru = totalPenjualan + totalKeranjang;
+    
     setTotalPenjualan(penjualanBaru);
     setCart([]);
     localStorage.removeItem('kasir_cart_sementara');
@@ -118,7 +121,7 @@ export default function App() {
     }
   };
 
-  // Handler Rincian Pengeluaran
+  // === FUNGSI: MANAJEMEN PENGELUARAN ===
   const handleTambahPengeluaran = () => {
     if (!inputNamaPengeluaran || !inputNominalPengeluaran) return;
     
@@ -144,7 +147,7 @@ export default function App() {
     updateDatabase({ pengeluaran: totalBaru });
   };
 
-  // Handler Uang Fisik Laci
+  // === FUNGSI: UANG LACI & KALKULASI AKHIR ===
   const handleUangFisikChange = (e) => {
     const angka = e.target.value.replace(/\D/g, '');
     setUangFisikLaci(angka ? Number(angka) : '');
@@ -154,17 +157,11 @@ export default function App() {
     updateDatabase({ penyesuaian: Number(uangFisikLaci) || 0 });
   };
 
-  // --- LOGIKA KEUANGAN BARU ---
-  // Uang fisik laci tampil 0 jika belum diinput.
   const displayUangLaci = uangFisikLaci !== '' ? uangFisikLaci : 0;
-  
-  // Selisih Laci = Uang Fisik yang ada di laci dikurang Total Penjualan Sistem.
-  // Hanya tampil selisih jika uang laci sudah diinput.
   const selisihKas = uangFisikLaci !== '' ? (displayUangLaci - totalPenjualan) : 0;
-  
-  // Laba Bersih = Murni Total Penjualan dikurang Total Pengeluaran (TIDAK melibatkan fisik laci).
   const keuntunganBersih = totalPenjualan - totalPengeluaran;
 
+  // === FUNGSI: REPORTING ===
   const bagikanLaporan = () => {
     const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
@@ -208,7 +205,7 @@ _Dibuat Oleh © Agustian._`;
 
       <div className="flex flex-col lg:flex-row gap-4 p-4 flex-grow">
         
-        {/* KIRI: DAFTAR MENU */}
+        {/* === AREA KIRI: KATALOG MENU === */}
         <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="flex overflow-x-auto p-3 gap-2 border-b border-slate-100 bg-slate-50 scrollbar-hide">
             {['Semua', 'food', 'snack', 'drink'].map(kat => (
@@ -255,7 +252,7 @@ _Dibuat Oleh © Agustian._`;
           </div>
         </div>
 
-        {/* TENGAH: KERANJANG */}
+        {/* === AREA TENGAH: KERANJANG === */}
         <div className="w-full lg:w-96 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-auto max-h-[50vh] lg:max-h-full">
           <div className="p-4 border-b border-slate-100 bg-slate-50">
             <h2 className="text-base font-bold text-slate-800">Keranjang ({cart.length})</h2>
@@ -299,9 +296,10 @@ _Dibuat Oleh © Agustian._`;
           </div>
         </div>
 
-        {/* KANAN: LAPORAN & INPUT FISIK */}
+        {/* === AREA KANAN: REKAPITULASI & INPUT FISIK === */}
         <div className="w-full lg:w-80 flex flex-col gap-4">
           
+          {/* Laporan Laba/Rugi */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <h3 className="font-bold text-slate-800 mb-4 text-center border-b border-slate-100 pb-3">Laporan Harian</h3>
             <div className="space-y-3">
@@ -338,7 +336,7 @@ _Dibuat Oleh © Agustian._`;
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
             
-            {/* Form Uang Laci */}
+            {/* Input Nominal Fisik Laci */}
             <label className="block text-sm font-semibold text-slate-700 mb-1">Total Uang Di Laci</label>
             <input 
               type="text" 
@@ -350,49 +348,50 @@ _Dibuat Oleh © Agustian._`;
               placeholder="Masukkan hitungan asli uang laci..."
             />
 
-            {/* Form Rincian Pengeluaran */}
+            {/* Input Rincian Pengeluaran */}
             <label className="block text-sm font-semibold text-slate-700 mb-1">Catat Pengeluaran</label>
             <div className="flex flex-col gap-2 mb-3">
               <input 
                 type="text" 
                 value={inputNamaPengeluaran}
                 onChange={(e) => setInputNamaPengeluaran(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-sm"
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500"
                 placeholder="Nama (Misal: Gas, Bumbu)"
               />
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <input 
                   type="text" 
                   inputMode="numeric"
                   value={inputNominalPengeluaran ? Number(inputNominalPengeluaran).toLocaleString('id-ID') : ''}
                   onChange={(e) => setInputNominalPengeluaran(e.target.value.replace(/\D/g, ''))}
-                  className="flex-1 bg-slate-50 border border-slate-300 rounded-lg p-2 text-sm"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500"
                   placeholder="Rp..."
                 />
                 <button 
                   onClick={handleTambahPengeluaran}
-                  className="bg-slate-800 text-white px-4 rounded-lg text-sm font-bold active:bg-slate-700"
+                  className="flex-shrink-0 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold active:bg-slate-700 transition"
                 >
-                  + Tambah
+                  Add +
                 </button>
               </div>
             </div>
 
-            {/* List Pengeluaran */}
+            {/* Daftar Rincian Pengeluaran Aktif */}
             {rincianPengeluaran.length > 0 && (
-              <div className="mb-4 space-y-2 max-h-32 overflow-y-auto">
+              <div className="mb-4 space-y-2 max-h-32 overflow-y-auto pr-1">
                 {rincianPengeluaran.map(item => (
                   <div key={item.id} className="flex justify-between items-center bg-rose-50 p-2 rounded border border-rose-100 text-xs">
                     <span className="font-semibold text-rose-700">{item.nama}</span>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-rose-600">Rp {item.nominal.toLocaleString('id-ID')}</span>
-                      <button onClick={() => hapusPengeluaran(item.id)} className="text-rose-400 hover:text-rose-700 font-bold">✕</button>
+                      <button onClick={() => hapusPengeluaran(item.id)} className="text-rose-400 hover:text-rose-700 font-bold px-1">✕</button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
             
+            {/* Tombol Eksekusi Akhir */}
             <button 
               onClick={bagikanLaporan} 
               className="w-full mb-2 mt-2 bg-[#25D366] hover:bg-[#128C7E] text-white py-3 rounded-lg font-bold text-sm active:bg-[#075E54] transition"

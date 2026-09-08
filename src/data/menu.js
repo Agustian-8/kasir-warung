@@ -9,5 +9,7 @@ export const menuItems = [
   { id: 8, name: 'Teh Es', price: 3000, type: 'drink' },
   { id: 9, name: 'Pop Ice', price: 5000, type: 'drink' },
   { id: 10, name: 'Es Creamy', price: 5000, type: 'drink' },
-  { id: 11, name: 'Nutrisari', price: 3000, type: 'drink' }
+  { id: 11, name: 'Nutrisari', price: 3000, type: 'drink' },
+  { id: 12, name: 'Kopi Hitam', price: 5000, type: 'drink' },
+  { id: 13, name: 'Es Tawar', price: 2000, type: 'drink' }
 ];
