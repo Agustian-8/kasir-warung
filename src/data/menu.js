@@ -1,7 +1,7 @@
 export const menuItems = [
-  { id: 1, name: 'Nasi Kuning', price: 5000, type: 'food', addon: 2000 },
-  { id: 2, name: 'Soto', price: 5000, type: 'food', addon: 2000 },
-  { id: 3, name: 'Bubur', price: 5000, type: 'food', addon: 2000 },
+  { id: 1, name: 'Nasi Kuning', price: 5000, type: 'food' },
+  { id: 2, name: 'Soto', price: 5000, type: 'food' },
+  { id: 3, name: 'Bubur', price: 5000, type: 'food' },
   { id: 4, name: 'Gorengan', price: 1000, type: 'snack' },
   { id: 5, name: 'Kue Tradisional', price: 1000, type: 'snack' },
   { id: 6, name: 'Kerupuk Makaroni', price: 1000, type: 'snack' },

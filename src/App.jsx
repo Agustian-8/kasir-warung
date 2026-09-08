@@ -12,12 +12,26 @@ export default function App() {
 
   // State data dari database Cloud
   const [totalPenjualan, setTotalPenjualan] = useState(0);
-  const [pengeluaran, setPengeluaran] = useState(0);
-  const [uangFisikLaci, setUangFisikLaci] = useState(0);
+  const [uangFisikLaci, setUangFisikLaci] = useState(''); // Diset string kosong agar default tidak 0 di input
+
+  // State Rincian Pengeluaran
+  const [rincianPengeluaran, setRincianPengeluaran] = useState(() => {
+    const saved = localStorage.getItem('kasir_rincian_pengeluaran');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [inputNamaPengeluaran, setInputNamaPengeluaran] = useState('');
+  const [inputNominalPengeluaran, setInputNominalPengeluaran] = useState('');
+
+  // Total pengeluaran dikalkulasi otomatis dari rincian
+  const totalPengeluaran = rincianPengeluaran.reduce((sum, item) => sum + item.nominal, 0);
 
   useEffect(() => {
     localStorage.setItem('kasir_cart_sementara', JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem('kasir_rincian_pengeluaran', JSON.stringify(rincianPengeluaran));
+  }, [rincianPengeluaran]);
 
   useEffect(() => {
     fetchData();
@@ -25,7 +39,6 @@ export default function App() {
     const channel = supabase
       .channel('public:rekap_harian')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rekap_harian' }, (payload) => {
-        // Update hanya jika data dari server berbeda, agar tidak mengganggu ketikan aktif
         setTotalPenjualan(payload.new.total_penjualan);
       })
       .subscribe();
@@ -44,12 +57,10 @@ export default function App() {
     
     if (data) {
       setTotalPenjualan(data.total_penjualan);
-      setPengeluaran(data.pengeluaran || 0);
-      setUangFisikLaci(data.penyesuaian || 0);
+      setUangFisikLaci(data.penyesuaian === 0 ? '' : data.penyesuaian); // Handle nilai awal
     }
   };
 
-  // Fungsi simpan universal ke database
   const updateDatabase = async (dataBaru) => {
     await supabase
       .from('rekap_harian')
@@ -60,10 +71,11 @@ export default function App() {
       .eq('id', 1);
   };
 
-  const addToCart = (item, qty = 1, withEgg = false) => {
-    const basePrice = withEgg ? item.price + item.addon : item.price;
-    const itemName = withEgg ? `${item.name} + Telur` : item.name;
-    const cartId = withEgg ? `${item.id}-egg` : `${item.id}-normal`;
+  // Fungsi tambah ke keranjang dengan varian harga
+  const addToCart = (item, qty = 1, variantName = '', additionalPrice = 0) => {
+    const basePrice = item.price + additionalPrice;
+    const itemName = variantName ? `${item.name} ${variantName}` : item.name;
+    const cartId = variantName ? `${item.id}-${variantName.replace(/\s+/g, '')}` : `${item.id}-normal`;
 
     setCart(prevCart => {
       const existingItem = prevCart.find(c => c.cartId === cartId);
@@ -76,14 +88,8 @@ export default function App() {
     });
   };
 
-  const tambahQty = (cartId) => {
-    setCart(prev => prev.map(c => c.cartId === cartId ? { ...c, qty: c.qty + 1, totalPrice: (c.qty + 1) * c.basePrice } : c));
-  };
-
-  const kurangiQty = (cartId) => {
-    setCart(prev => prev.map(c => c.cartId === cartId ? { ...c, qty: c.qty - 1, totalPrice: (c.qty - 1) * c.basePrice } : c).filter(c => c.qty > 0));
-  };
-
+  const tambahQty = (cartId) => setCart(prev => prev.map(c => c.cartId === cartId ? { ...c, qty: c.qty + 1, totalPrice: (c.qty + 1) * c.basePrice } : c));
+  const kurangiQty = (cartId) => setCart(prev => prev.map(c => c.cartId === cartId ? { ...c, qty: c.qty - 1, totalPrice: (c.qty - 1) * c.basePrice } : c).filter(c => c.qty > 0));
   const hapusItem = (cartId) => setCart(cart => cart.filter(c => c.cartId !== cartId));
 
   const totalKeranjang = cart.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -97,67 +103,90 @@ export default function App() {
 
     await updateDatabase({ 
       total_penjualan: penjualanBaru, 
-      pengeluaran: pengeluaran, 
-      penyesuaian: uangFisikLaci 
+      pengeluaran: totalPengeluaran, 
+      penyesuaian: Number(uangFisikLaci) || 0 
     });
   };
 
   const resetRekapHarian = async () => {
     if(window.confirm('Yakin ingin mereset buku hari ini? Pastikan laporan sudah dikirim ke WhatsApp.')) {
       setTotalPenjualan(0);
-      setPengeluaran(0);
-      setUangFisikLaci(0);
+      setRincianPengeluaran([]);
+      setUangFisikLaci('');
+      localStorage.removeItem('kasir_rincian_pengeluaran');
       await updateDatabase({ total_penjualan: 0, pengeluaran: 0, penyesuaian: 0 });
     }
   };
 
-  // Handler Pengeluaran (Lokal mulus, simpan saat selesai / onBlur)
-  const handlePengeluaranChange = (e) => {
-    const hanyaAngka = Number(e.target.value.replace(/\D/g, ''));
-    setPengeluaran(hanyaAngka);
+  // Handler Rincian Pengeluaran
+  const handleTambahPengeluaran = () => {
+    if (!inputNamaPengeluaran || !inputNominalPengeluaran) return;
+    
+    const pengeluaranBaru = {
+      id: Date.now(),
+      nama: inputNamaPengeluaran,
+      nominal: Number(inputNominalPengeluaran)
+    };
+
+    const rincianBaru = [...rincianPengeluaran, pengeluaranBaru];
+    setRincianPengeluaran(rincianBaru);
+    setInputNamaPengeluaran('');
+    setInputNominalPengeluaran('');
+
+    const totalBaru = rincianBaru.reduce((sum, item) => sum + item.nominal, 0);
+    updateDatabase({ pengeluaran: totalBaru });
   };
 
-  const simpanPengeluaranServer = () => {
-    updateDatabase({ 
-      total_penjualan: totalPenjualan, 
-      pengeluaran: pengeluaran, 
-      penyesuaian: uangFisikLaci 
-    });
+  const hapusPengeluaran = (id) => {
+    const rincianBaru = rincianPengeluaran.filter(p => p.id !== id);
+    setRincianPengeluaran(rincianBaru);
+    const totalBaru = rincianBaru.reduce((sum, item) => sum + item.nominal, 0);
+    updateDatabase({ pengeluaran: totalBaru });
   };
 
-  // Handler Uang Fisik Laci (Lokal mulus, simpan saat selesai / onBlur)
+  // Handler Uang Fisik Laci
   const handleUangFisikChange = (e) => {
-    const hanyaAngka = Number(e.target.value.replace(/\D/g, ''));
-    setUangFisikLaci(hanyaAngka);
+    const angka = e.target.value.replace(/\D/g, '');
+    setUangFisikLaci(angka ? Number(angka) : '');
   };
 
   const simpanUangFisikServer = () => {
-    updateDatabase({ 
-      total_penjualan: totalPenjualan, 
-      pengeluaran: pengeluaran, 
-      penyesuaian: uangFisikLaci 
-    });
+    updateDatabase({ penyesuaian: Number(uangFisikLaci) || 0 });
   };
 
-  const kasAktifFisik = uangFisikLaci > 0 ? uangFisikLaci : totalPenjualan;
-  const selisihKas = kasAktifFisik - totalPenjualan;
-  const keuntunganBersih = kasAktifFisik - pengeluaran;
+  // --- LOGIKA KEUANGAN BARU ---
+  // Uang fisik laci tampil 0 jika belum diinput.
+  const displayUangLaci = uangFisikLaci !== '' ? uangFisikLaci : 0;
+  
+  // Selisih Laci = Uang Fisik yang ada di laci dikurang Total Penjualan Sistem.
+  // Hanya tampil selisih jika uang laci sudah diinput.
+  const selisihKas = uangFisikLaci !== '' ? (displayUangLaci - totalPenjualan) : 0;
+  
+  // Laba Bersih = Murni Total Penjualan dikurang Total Pengeluaran (TIDAK melibatkan fisik laci).
+  const keuntunganBersih = totalPenjualan - totalPengeluaran;
 
   const bagikanLaporan = () => {
     const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
+    let teksPengeluaran = rincianPengeluaran.length > 0 
+      ? rincianPengeluaran.map(p => `- ${p.nama}: Rp ${p.nominal.toLocaleString('id-ID')}`).join('\n')
+      : '- Tidak ada';
+
     const teksLaporan = 
 `*LAPORAN HARIAN WARUNG*
 ${tanggal}
 
 *TOTAL PENJUALAN* : Rp ${totalPenjualan.toLocaleString('id-ID')}
-*UANG DI LACI* : Rp ${kasAktifFisik.toLocaleString('id-ID')}
-*SELISIH / KAS*     : ${selisihKas >= 0 ? '+ Rp ' + selisihKas.toLocaleString('id-ID') : '- Rp ' + Math.abs(selisihKas).toLocaleString('id-ID')}
+*UANG DI LACI* : Rp ${displayUangLaci.toLocaleString('id-ID')}
+*SELISIH* : ${uangFisikLaci !== '' ? (selisihKas >= 0 ? '+ Rp ' + selisihKas.toLocaleString('id-ID') : '- Rp ' + Math.abs(selisihKas).toLocaleString('id-ID')) : 'Belum dihitung'}
 
-*TOTAL PENGELUARAN*        : Rp ${pengeluaran.toLocaleString('id-ID')}
+*RINCIAN PENGELUARAN* :
+${teksPengeluaran}
+*TOTAL PENGELUARAN* : Rp ${totalPengeluaran.toLocaleString('id-ID')}
 
 ━━━━━━━━━━━━━━━━━━
-*LABA BERSIH*
+*LABA BERSIH HARI INI*
+(Total Penjualan - Total Pengeluaran)
 *Rp ${keuntunganBersih.toLocaleString('id-ID')}*
 ━━━━━━━━━━━━━━━━━━
 
@@ -195,7 +224,7 @@ _Dibuat Oleh © Agustian._`;
             ))}
           </div>
 
-          <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4 overflow-y-auto max-h-[60vh] lg:max-h-full">
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4 overflow-y-auto max-h-[60vh] lg:max-h-full">
             {menuTampil.map(item => (
               <div key={item.id} className="bg-white border border-slate-200 p-3 lg:p-4 rounded-xl flex flex-col justify-between">
                 <div className="mb-3">
@@ -211,9 +240,11 @@ _Dibuat Oleh © Agustian._`;
                       <button onClick={() => addToCart(item, 10)} className="bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs lg:text-sm active:bg-indigo-700">+10</button>
                     </div>
                   ) : item.type === 'food' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-1 lg:gap-2">
-                      <button onClick={() => addToCart(item, 1)} className="bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs lg:text-sm active:bg-indigo-700">Pesan</button>
-                      <button onClick={() => addToCart(item, 1, true)} className="bg-slate-800 text-white py-2 rounded-lg font-semibold text-xs lg:text-sm active:bg-slate-700">+ Telur</button>
+                    <div className="grid grid-cols-2 gap-1 lg:gap-2">
+                      <button onClick={() => addToCart(item, 1, '', 0)} className="bg-slate-100 text-slate-700 py-2 rounded-lg font-semibold text-xs active:bg-slate-200">Biasa</button>
+                      <button onClick={() => addToCart(item, 1, '+ ½ Telur', 2000)} className="bg-indigo-50 text-indigo-700 py-2 rounded-lg font-semibold text-xs active:bg-indigo-100">+ ½ Telur</button>
+                      <button onClick={() => addToCart(item, 1, '+ 1 Telur', 3000)} className="bg-indigo-100 text-indigo-800 py-2 rounded-lg font-semibold text-xs active:bg-indigo-200">+ 1 Telur</button>
+                      <button onClick={() => addToCart(item, 1, 'Komplit', 5000)} className="bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs active:bg-indigo-700">Komplit</button>
                     </div>
                   ) : (
                     <button onClick={() => addToCart(item, 1)} className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs lg:text-sm active:bg-indigo-700">Pesan</button>
@@ -280,17 +311,21 @@ _Dibuat Oleh © Agustian._`;
               </div>
               <div className="flex justify-between items-center">
                 <p className="text-xs font-semibold text-slate-500 uppercase">Uang Di Laci</p>
-                <p className="text-sm font-bold text-indigo-600">Rp {kasAktifFisik.toLocaleString('id-ID')}</p>
+                <p className="text-sm font-bold text-slate-800">Rp {displayUangLaci.toLocaleString('id-ID')}</p>
               </div>
               <div className="flex justify-between items-center">
                 <p className="text-xs font-semibold text-slate-500 uppercase">Selisih</p>
-                <p className={`text-sm font-bold ${selisihKas >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                  {selisihKas >= 0 ? `+${selisihKas.toLocaleString('id-ID')}` : selisihKas.toLocaleString('id-ID')}
-                </p>
+                {uangFisikLaci !== '' ? (
+                  <p className={`text-sm font-bold ${selisihKas >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {selisihKas >= 0 ? `+${selisihKas.toLocaleString('id-ID')}` : selisihKas.toLocaleString('id-ID')}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">Belum diinput</p>
+                )}
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
                 <p className="text-xs font-semibold text-slate-500 uppercase">Total Pengeluaran</p>
-                <p className="text-sm font-bold text-rose-500">- Rp {pengeluaran.toLocaleString('id-ID')}</p>
+                <p className="text-sm font-bold text-rose-500">- Rp {totalPengeluaran.toLocaleString('id-ID')}</p>
               </div>
               <div className="pt-3 border-t-2 border-slate-100">
                 <p className="text-xs font-bold text-slate-500 uppercase text-center mb-1">Laba Bersih</p>
@@ -302,6 +337,8 @@ _Dibuat Oleh © Agustian._`;
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+            
+            {/* Form Uang Laci */}
             <label className="block text-sm font-semibold text-slate-700 mb-1">Total Uang Di Laci</label>
             <input 
               type="text" 
@@ -310,23 +347,55 @@ _Dibuat Oleh © Agustian._`;
               onChange={handleUangFisikChange}
               onBlur={simpanUangFisikServer}
               className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 mb-4"
-              placeholder="Rp 0"
+              placeholder="Masukkan hitungan asli uang laci..."
             />
 
-            <label className="block text-sm font-semibold text-slate-700 mb-1">Total Pengeluaran</label>
-            <input 
-              type="text" 
-              inputMode="numeric"
-              value={pengeluaran ? pengeluaran.toLocaleString('id-ID') : ''}
-              onChange={handlePengeluaranChange}
-              onBlur={simpanPengeluaranServer}
-              className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500 mb-5"
-              placeholder="Rp 0"
-            />
+            {/* Form Rincian Pengeluaran */}
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Catat Pengeluaran</label>
+            <div className="flex flex-col gap-2 mb-3">
+              <input 
+                type="text" 
+                value={inputNamaPengeluaran}
+                onChange={(e) => setInputNamaPengeluaran(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-sm"
+                placeholder="Nama (Misal: Gas, Bumbu)"
+              />
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  value={inputNominalPengeluaran ? Number(inputNominalPengeluaran).toLocaleString('id-ID') : ''}
+                  onChange={(e) => setInputNominalPengeluaran(e.target.value.replace(/\D/g, ''))}
+                  className="flex-1 bg-slate-50 border border-slate-300 rounded-lg p-2 text-sm"
+                  placeholder="Rp..."
+                />
+                <button 
+                  onClick={handleTambahPengeluaran}
+                  className="bg-slate-800 text-white px-4 rounded-lg text-sm font-bold active:bg-slate-700"
+                >
+                  + Tambah
+                </button>
+              </div>
+            </div>
+
+            {/* List Pengeluaran */}
+            {rincianPengeluaran.length > 0 && (
+              <div className="mb-4 space-y-2 max-h-32 overflow-y-auto">
+                {rincianPengeluaran.map(item => (
+                  <div key={item.id} className="flex justify-between items-center bg-rose-50 p-2 rounded border border-rose-100 text-xs">
+                    <span className="font-semibold text-rose-700">{item.nama}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-rose-600">Rp {item.nominal.toLocaleString('id-ID')}</span>
+                      <button onClick={() => hapusPengeluaran(item.id)} className="text-rose-400 hover:text-rose-700 font-bold">✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             
             <button 
               onClick={bagikanLaporan} 
-              className="w-full mb-2 bg-[#25D366] hover:bg-[#128C7E] text-white py-3 rounded-lg font-bold text-sm active:bg-[#075E54] transition"
+              className="w-full mb-2 mt-2 bg-[#25D366] hover:bg-[#128C7E] text-white py-3 rounded-lg font-bold text-sm active:bg-[#075E54] transition"
             >
               Kirim Otomatis ke WA
             </button>
