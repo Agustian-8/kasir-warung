@@ -181,9 +181,9 @@ export default function App() {
     updateDatabase({ penyesuaian: Number(uangFisikLaci) || 0 });
   };
 
-  const displayUangLaci = uangFisikLaci !== '' ? uangFisikLaci : 0;
-  const selisihKas = uangFisikLaci !== '' ? (displayUangLaci - totalPenjualan) : 0;
   const keuntunganBersih = totalPenjualan - totalPengeluaran;
+  const displayUangLaci = uangFisikLaci !== '' ? uangFisikLaci : 0;
+  const selisihKas = uangFisikLaci !== '' ? (displayUangLaci - keuntunganBersih) : 0;
 
   // === FUNGSI: REPORTING ===
   const bagikanLaporan = () => {
@@ -266,6 +266,12 @@ _Dibuat Oleh © Agustian._`;
                       <button onClick={() => addToCart(item, 1, '+ ½ Telur', 2000)} className="bg-indigo-50 text-indigo-700 py-2 rounded-lg font-semibold text-xs active:bg-indigo-100">+ ½ Telur</button>
                       <button onClick={() => addToCart(item, 1, '+ 1 Telur', 3000)} className="bg-indigo-100 text-indigo-800 py-2 rounded-lg font-semibold text-xs active:bg-indigo-200">+ 1 Telur</button>
                       <button onClick={() => addToCart(item, 1, 'Komplit', 5000)} className="bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs active:bg-indigo-700">Komplit</button>
+                    </div>
+                  // KONDISI BARU: KHUSUS UNTUK ES KELAPA MUDA
+                  ) : item.name === 'Es Kelapa Muda' ? (
+                    <div className="grid grid-cols-2 gap-1 lg:gap-2">
+                      <button onClick={() => addToCart(item, 1, '(5K)', 0)} className="bg-slate-100 text-slate-700 py-2 rounded-lg font-semibold text-xs active:bg-slate-200">Rp 5.000</button>
+                      <button onClick={() => addToCart(item, 1, '(7K)', 2000)} className="bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs active:bg-indigo-700">Rp 7.000</button>
                     </div>
                   ) : (
                     <button onClick={() => addToCart(item, 1)} className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs lg:text-sm active:bg-indigo-700">Pesan</button>
