@@ -6,7 +6,7 @@ export const menuItems = [
   { id: 5, name: 'Kue Tradisional', price: 1000, type: 'snack' },
   { id: 6, name: 'Makaroni', price: 1000, type: 'snack' },
   { id: 7, name: 'Extrajoss Susu', price: 5000, type: 'drink' },
-  { id: 8, name: 'Teh Es', price: 3000, type: 'drink' },
+  { id: 8, name: 'Teh', price: 3000, type: 'drink' },
   { id: 9, name: 'Pop Ice', price: 5000, type: 'drink' },
   { id: 10, name: 'Es Creamy', price: 5000, type: 'drink' },
   { id: 11, name: 'Nutrisari', price: 3000, type: 'drink' },

@@ -10,9 +10,16 @@ export default function App() {
   });
   const [activeKategori, setActiveKategori] = useState('Semua');
 
-  // === STATE: DATA DATABASE (REKAP HARIAN) ===
+  // === STATE: DATA DATABASE (REKAP HARIAN & PENJUALAN MENU) ===
   const [totalPenjualan, setTotalPenjualan] = useState(0);
-  const [uangFisikLaci, setUangFisikLaci] = useState(''); // String kosong agar input tidak default 0
+  const [uangFisikLaci, setUangFisikLaci] = useState('');
+  
+  const [rincianPenjualan, setRincianPenjualan] = useState(() => {
+    const saved = localStorage.getItem('kasir_rincian_penjualan');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [showRekapModal, setShowRekapModal] = useState(false);
 
   // === STATE: PENGELUARAN ===
   const [rincianPengeluaran, setRincianPengeluaran] = useState(() => {
@@ -34,16 +41,27 @@ export default function App() {
   }, [rincianPengeluaran]);
 
   useEffect(() => {
+    localStorage.setItem('kasir_rincian_penjualan', JSON.stringify(rincianPenjualan));
+  }, [rincianPenjualan]);
+
+  useEffect(() => {
     fetchData();
 
-    // Listener realtime untuk update otomatis dari device lain
     const channel = supabase
       .channel('public:rekap_harian')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rekap_harian' }, (payload) => {
         setTotalPenjualan(payload.new.total_penjualan);
-        // SINKRONISASI REAL-TIME UNTUK PENGELUARAN
+        
         if (payload.new.rincian_pengeluaran) {
           setRincianPengeluaran(payload.new.rincian_pengeluaran);
+        }
+        
+        if (payload.new.rincian_penjualan) {
+          setRincianPenjualan(payload.new.rincian_penjualan);
+        }
+
+        if (payload.new.penyesuaian !== undefined) {
+          setUangFisikLaci(payload.new.penyesuaian === 0 ? '' : payload.new.penyesuaian);
         }
       })
       .subscribe();
@@ -63,9 +81,13 @@ export default function App() {
     if (data) {
       setTotalPenjualan(data.total_penjualan);
       setUangFisikLaci(data.penyesuaian === 0 ? '' : data.penyesuaian);
-      // TARIK RINCIAN PENGELUARAN DARI DATABASE SAAT AWAL LOAD
+      
       if (data.rincian_pengeluaran) {
         setRincianPengeluaran(data.rincian_pengeluaran);
+      }
+
+      if (data.rincian_penjualan) {
+        setRincianPenjualan(data.rincian_penjualan);
       }
     }
   };
@@ -106,16 +128,30 @@ export default function App() {
   // === FUNGSI: TRANSAKSI & RESET ===
   const prosesPembayaran = async () => {
     if (cart.length === 0) return;
+    
     const penjualanBaru = totalPenjualan + totalKeranjang;
+    const rekapPenjualanBaru = [...rincianPenjualan];
+    
+    cart.forEach(cartItem => {
+      const existingIndex = rekapPenjualanBaru.findIndex(item => item.cartId === cartItem.cartId);
+      if (existingIndex !== -1) {
+        rekapPenjualanBaru[existingIndex].qty += cartItem.qty;
+        rekapPenjualanBaru[existingIndex].totalPrice += cartItem.totalPrice;
+      } else {
+        rekapPenjualanBaru.push({ ...cartItem });
+      }
+    });
     
     setTotalPenjualan(penjualanBaru);
+    setRincianPenjualan(rekapPenjualanBaru);
     setCart([]);
     localStorage.removeItem('kasir_cart_sementara');
 
     await updateDatabase({ 
       total_penjualan: penjualanBaru, 
       pengeluaran: totalPengeluaran, 
-      penyesuaian: Number(uangFisikLaci) || 0 
+      penyesuaian: Number(uangFisikLaci) || 0,
+      rincian_penjualan: rekapPenjualanBaru 
     });
   };
 
@@ -123,14 +159,18 @@ export default function App() {
     if(window.confirm('Yakin ingin mereset buku hari ini? Pastikan laporan sudah dikirim ke WhatsApp.')) {
       setTotalPenjualan(0);
       setRincianPengeluaran([]);
+      setRincianPenjualan([]); 
       setUangFisikLaci('');
+      
       localStorage.removeItem('kasir_rincian_pengeluaran');
-      // KOSONGKAN JUGA KOLOM RINCIAN DI DATABASE
+      localStorage.removeItem('kasir_rincian_penjualan');
+      
       await updateDatabase({ 
         total_penjualan: 0, 
         pengeluaran: 0, 
         penyesuaian: 0,
-        rincian_pengeluaran: []
+        rincian_pengeluaran: [],
+        rincian_penjualan: []
       });
     }
   };
@@ -152,7 +192,6 @@ export default function App() {
 
     const totalBaru = rincianBaru.reduce((sum, item) => sum + item.nominal, 0);
     
-    // KIRIM JUGA DATA JSON-NYA KE DATABASE
     updateDatabase({ 
       pengeluaran: totalBaru,
       rincian_pengeluaran: rincianBaru 
@@ -164,7 +203,6 @@ export default function App() {
     setRincianPengeluaran(rincianBaru);
     const totalBaru = rincianBaru.reduce((sum, item) => sum + item.nominal, 0);
     
-    // UPDATE JUGA DATA JSON-NYA KE DATABASE SETELAH DIHAPUS
     updateDatabase({ 
       pengeluaran: totalBaru,
       rincian_pengeluaran: rincianBaru 
@@ -185,10 +223,38 @@ export default function App() {
   const displayUangLaci = uangFisikLaci !== '' ? uangFisikLaci : 0;
   const selisihKas = uangFisikLaci !== '' ? (displayUangLaci - keuntunganBersih) : 0;
 
+  // === LOGIKA GROUPING UNTUK MODAL REKAP ===
+  const groupedPenjualan = rincianPenjualan.reduce((acc, item) => {
+    const menuId = parseInt(item.cartId.split('-')[0]); 
+    const menuAsli = menuItems.find(m => m.id === menuId); 
+    const namaDasar = menuAsli ? menuAsli.name : item.name;
+
+    if (!acc[namaDasar]) {
+      acc[namaDasar] = {
+        namaDasar: namaDasar,
+        totalQty: 0,
+        totalUang: 0,
+        rincian: []
+      };
+    }
+    
+    acc[namaDasar].totalQty += item.qty;
+    acc[namaDasar].totalUang += item.totalPrice;
+    acc[namaDasar].rincian.push(item);
+    
+    return acc;
+  }, {});
+
+  const arrayGroupedPenjualan = Object.values(groupedPenjualan);
+
   // === FUNGSI: REPORTING ===
   const bagikanLaporan = () => {
     const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
+    let teksMenuTerjual = rincianPenjualan.length > 0
+      ? rincianPenjualan.map(p => `- ${p.name} : ${p.qty}x`).join('\n')
+      : '- Belum ada penjualan hari ini';
+
     let teksPengeluaran = rincianPengeluaran.length > 0 
       ? rincianPengeluaran.map(p => `- ${p.nama}: Rp ${p.nominal.toLocaleString('id-ID')}`).join('\n')
       : '- Tidak ada';
@@ -196,6 +262,10 @@ export default function App() {
     const teksLaporan = 
 `*LAPORAN HARIAN WARUNG*
 ${tanggal}
+
+*MENU TERJUAL HARI INI:*
+${teksMenuTerjual}
+━━━━━━━━━━━━━━━━━━
 
 *TOTAL PENJUALAN* : Rp ${totalPenjualan.toLocaleString('id-ID')}
 *UANG DI LACI* : Rp ${displayUangLaci.toLocaleString('id-ID')}
@@ -221,7 +291,7 @@ _Dibuat Oleh © Agustian._`;
   const menuTampil = activeKategori === 'Semua' ? menuItems : menuItems.filter(m => m.type === activeKategori);
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col">
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col relative">
       <header className="bg-white p-4 shadow-sm border-b border-slate-200 sticky top-0 z-10 flex justify-between items-center">
         <h1 className="text-xl lg:text-2xl font-bold text-slate-900">KasirKu</h1>
         <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-3 py-1 rounded-full animate-pulse">● Agustian</span>
@@ -267,11 +337,15 @@ _Dibuat Oleh © Agustian._`;
                       <button onClick={() => addToCart(item, 1, '+ 1 Telur', 3000)} className="bg-indigo-100 text-indigo-800 py-2 rounded-lg font-semibold text-xs active:bg-indigo-200">+ 1 Telur</button>
                       <button onClick={() => addToCart(item, 1, 'Komplit', 5000)} className="bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs active:bg-indigo-700">Komplit</button>
                     </div>
-                  // KONDISI BARU: KHUSUS UNTUK ES KELAPA MUDA
                   ) : item.name === 'Es Kelapa Muda' ? (
                     <div className="grid grid-cols-2 gap-1 lg:gap-2">
                       <button onClick={() => addToCart(item, 1, '(5K)', 0)} className="bg-slate-100 text-slate-700 py-2 rounded-lg font-semibold text-xs active:bg-slate-200">Rp 5.000</button>
                       <button onClick={() => addToCart(item, 1, '(7K)', 2000)} className="bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs active:bg-indigo-700">Rp 7.000</button>
+                    </div>
+                  ) : item.name === 'Teh' ? (
+                    <div className="grid grid-cols-2 gap-1 lg:gap-2">
+                      <button onClick={() => addToCart(item, 1, 'Dingin', 0)} className="bg-blue-50 text-blue-700 py-2 rounded-lg font-semibold text-xs active:bg-blue-100">Dingin</button>
+                      <button onClick={() => addToCart(item, 1, 'Hangat', 0)} className="bg-orange-50 text-orange-700 py-2 rounded-lg font-semibold text-xs active:bg-orange-100">Hangat</button>
                     </div>
                   ) : (
                     <button onClick={() => addToCart(item, 1)} className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold text-xs lg:text-sm active:bg-indigo-700">Pesan</button>
@@ -329,9 +403,16 @@ _Dibuat Oleh © Agustian._`;
         {/* === AREA KANAN: REKAPITULASI & INPUT FISIK === */}
         <div className="w-full lg:w-80 flex flex-col gap-4">
           
-          {/* Laporan Laba/Rugi */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <h3 className="font-bold text-slate-800 mb-4 text-center border-b border-slate-100 pb-3">Laporan Harian</h3>
+            
+            <button 
+              onClick={() => setShowRekapModal(true)}
+              className="w-full mb-4 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2"
+            >
+              📋 Lihat Menu Terjual Hari Ini
+            </button>
+
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <p className="text-xs font-semibold text-slate-500 uppercase">Total Penjualan</p>
@@ -366,7 +447,6 @@ _Dibuat Oleh © Agustian._`;
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
             
-            {/* Input Nominal Fisik Laci */}
             <label className="block text-sm font-semibold text-slate-700 mb-1">Total Uang Di Laci</label>
             <input 
               type="text" 
@@ -378,7 +458,6 @@ _Dibuat Oleh © Agustian._`;
               placeholder="Masukkan hitungan asli uang laci..."
             />
 
-            {/* Input Rincian Pengeluaran */}
             <label className="block text-sm font-semibold text-slate-700 mb-1">Catat Pengeluaran</label>
             <div className="flex flex-col gap-2 mb-3">
               <input 
@@ -406,7 +485,6 @@ _Dibuat Oleh © Agustian._`;
               </div>
             </div>
 
-            {/* Daftar Rincian Pengeluaran Aktif */}
             {rincianPengeluaran.length > 0 && (
               <div className="mb-4 space-y-2 max-h-32 overflow-y-auto pr-1">
                 {rincianPengeluaran.map(item => (
@@ -421,7 +499,6 @@ _Dibuat Oleh © Agustian._`;
               </div>
             )}
             
-            {/* Tombol Eksekusi Akhir */}
             <button 
               onClick={bagikanLaporan} 
               className="w-full mb-2 mt-2 bg-[#25D366] hover:bg-[#128C7E] text-white py-3 rounded-lg font-bold text-sm active:bg-[#075E54] transition"
@@ -439,6 +516,94 @@ _Dibuat Oleh © Agustian._`;
 
         </div>
       </div>
+
+      {/* === MODAL POP-UP REKAP PENJUALAN (VERSI GROUPING) === */}
+      {showRekapModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden animate-fade-in-up">
+            
+            {/* Header Modal */}
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                📋 Rekap Menu Terjual
+              </h2>
+              <button 
+                onClick={() => setShowRekapModal(false)} 
+                className="text-slate-400 hover:text-rose-500 font-bold text-2xl leading-none transition"
+              >
+                &times;
+              </button>
+            </div>
+            
+            {/* Isi Daftar Menu Grouping */}
+            <div className="p-4 overflow-y-auto flex-grow bg-white">
+              {arrayGroupedPenjualan.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 opacity-60">
+                  <span className="text-4xl mb-2">🍽️</span>
+                  <p className="text-center text-slate-500 text-sm font-medium">Belum ada menu yang terjual hari ini.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {arrayGroupedPenjualan.map((group, idx) => (
+                    <div key={idx} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                      
+                      {/* Header Grup (Nama Dasar Menu) */}
+                      <div className="bg-indigo-50 px-3 py-2 flex justify-between items-center border-b border-indigo-100">
+                        <span className="font-bold text-indigo-900">{group.namaDasar}</span>
+                        <span className="font-black text-indigo-700 text-xs bg-indigo-100 px-2 py-1 rounded">
+                          Total: {group.totalQty} Porsi
+                        </span>
+                      </div>
+                      
+                      {/* Rincian Varian per Grup */}
+                      <div className="bg-white p-3 space-y-2">
+                        {group.rincian.map((item, i) => (
+                          <div key={i} className="flex justify-between items-center text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 text-xs">▶</span>
+                              <span className="text-slate-700 font-medium">{item.name}</span>
+                            </div>
+                            <div className="flex gap-3 text-slate-600 text-xs font-semibold">
+                              <span>{item.qty}x</span>
+                              <span className="text-slate-800">Rp {item.totalPrice.toLocaleString('id-ID')}</span>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Subtotal Uang Per Grup */}
+                        <div className="flex justify-between items-center pt-2 mt-2 border-t border-slate-100">
+                          <span className="text-xs font-semibold text-slate-500">Pendapatan {group.namaDasar}</span>
+                          <span className="text-sm font-bold text-indigo-700">Rp {group.totalUang.toLocaleString('id-ID')}</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Footer Modal */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+              <div className="flex flex-col">
+                <span className="text-xs text-slate-500 font-semibold">Total Seluruh Item</span>
+                <span className="font-black text-slate-800 text-lg">
+                  {rincianPenjualan.reduce((sum, i) => sum + i.qty, 0)} Pcs
+                </span>
+              </div>
+              <button 
+                onClick={() => setShowRekapModal(false)} 
+                className="bg-slate-800 text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-700 transition"
+              >
+                Tutup Papan
+              </button>
+            </div>
+            
+          </div>
+        </div>
+      )}
+      {/* === END MODAL === */}
+
     </div>
   );
 }
