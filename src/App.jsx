@@ -268,28 +268,28 @@ export default function App() {
       : '- Tidak ada';
 
     const teksLaporan = 
-  `*LAPORAN HARIAN WARUNG*
-  ${tanggal}
+`*LAPORAN HARIAN WARUNG*
+${tanggal}
 
-  *MENU TERJUAL HARI INI:*
-  ${teksMenuTerjual}
-  ━━━━━━━━━━━━━━━━━━
+*MENU TERJUAL HARI INI:*
+${teksMenuTerjual}
+━━━━━━━━━━━━━━━━━━
 
-  *TOTAL PENJUALAN* : Rp ${totalPenjualan.toLocaleString('id-ID')}
-  *UANG DI LACI* : Rp ${displayUangLaci.toLocaleString('id-ID')}
-  *SELISIH* : ${uangFisikLaci !== '' ? (selisihKas >= 0 ? '+ Rp ' + selisihKas.toLocaleString('id-ID') : '- Rp ' + Math.abs(selisihKas).toLocaleString('id-ID')) : 'Belum dihitung'}
+*TOTAL PENJUALAN* : Rp ${totalPenjualan.toLocaleString('id-ID')}
+*UANG DI LACI* : Rp ${displayUangLaci.toLocaleString('id-ID')}
+*SELISIH* : ${uangFisikLaci !== '' ? (selisihKas >= 0 ? '+ Rp ' + selisihKas.toLocaleString('id-ID') : '- Rp ' + Math.abs(selisihKas).toLocaleString('id-ID')) : 'Belum dihitung'}
 
-  *RINCIAN PENGELUARAN* :
-  ${teksPengeluaran}
-  *TOTAL PENGELUARAN* : Rp ${totalPengeluaran.toLocaleString('id-ID')}
+*RINCIAN PENGELUARAN* :
+${teksPengeluaran}
+*TOTAL PENGELUARAN* : Rp ${totalPengeluaran.toLocaleString('id-ID')}
 
-  ━━━━━━━━━━━━━━━━━━
-  *LABA BERSIH HARI INI*
-  (Total Penjualan - Total Pengeluaran)
-  *Rp ${keuntunganBersih.toLocaleString('id-ID')}*
-  ━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━
+*LABA BERSIH HARI INI*
+(Total Penjualan - Total Pengeluaran)
+*Rp ${keuntunganBersih.toLocaleString('id-ID')}*
+━━━━━━━━━━━━━━━━━━
 
-  _Dibuat Oleh © Agustian._`;
+_Dibuat Oleh © Agustian._`;
 
     const nomorWA = "6289514215508";
     const linkWA = `https://wa.me/${nomorWA}?text=${encodeURIComponent(teksLaporan)}`;
@@ -328,7 +328,7 @@ export default function App() {
                 className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all active:scale-95 ${
                   activeKategori === kat 
                     ? 'bg-[#011f7b] text-white shadow-md' 
-                    : 'bg-white text-[#011f7b] border border-[#011f7b]/20 hover:border-[#FFBA09] hover:bg-[#FFBA09]/10'
+                    : 'bg-white text-[#011f7b] border border-[#011f7b]/20 hover:border-[#011f7b] hover:bg-[#011f7b]/5'
                 }`}
               >
                 {kat === 'food' ? 'Makanan' : kat === 'snack' ? 'Cemilan' : kat === 'drink' ? 'Minuman' : 'Semua'}
@@ -340,7 +340,7 @@ export default function App() {
             {menuTampil.map(item => (
               <div 
                 key={item.id} 
-                className="bg-[#EFEEEA]/60 border border-[#011f7b]/10 p-3 lg:p-4 rounded-xl flex flex-col justify-between hover:shadow-md hover:border-[#FFBA09] transition-all duration-200"
+                className="bg-[#EFEEEA]/60 border border-[#011f7b]/10 p-3 lg:p-4 rounded-xl flex flex-col justify-between hover:shadow-md hover:border-[#011f7b]/30 transition-all duration-200"
               >
                 <div className="mb-3">
                   <h3 className="font-bold text-[#011f7b] text-sm lg:text-base leading-tight">{item.name}</h3>
@@ -351,28 +351,28 @@ export default function App() {
                   {item.type === 'snack' ? (
                     <div className="grid grid-cols-3 gap-1 lg:gap-2">
                       <button onClick={() => addToCart(item, 1)} className="bg-[#011f7b]/10 text-[#011f7b] hover:bg-[#011f7b]/20 py-2 rounded-lg font-semibold text-xs lg:text-sm active:scale-95 transition-all">+1</button>
-                      <button onClick={() => addToCart(item, 5)} className="bg-[#FFBA09]/25 text-[#011f7b] hover:bg-[#FFBA09]/40 py-2 rounded-lg font-semibold text-xs lg:text-sm active:scale-95 transition-all">+5</button>
-                      <button onClick={() => addToCart(item, 10)} className="bg-[#FFBA09] text-[#011f7b] hover:bg-[#e6a608] py-2 rounded-lg font-bold text-xs lg:text-sm active:scale-95 transition-all shadow-sm">+10</button>
+                      <button onClick={() => addToCart(item, 5)} className="bg-[#011f7b]/20 text-[#011f7b] hover:bg-[#011f7b]/30 py-2 rounded-lg font-semibold text-xs lg:text-sm active:scale-95 transition-all">+5</button>
+                      <button onClick={() => addToCart(item, 10)} className="bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-bold text-xs lg:text-sm active:scale-95 transition-all shadow-sm">+10</button>
                     </div>
                   ) : item.type === 'food' ? (
                     <div className="grid grid-cols-2 gap-1 lg:gap-2">
                       <button onClick={() => addToCart(item, 1, '', 0)} className="bg-[#011f7b]/10 text-[#011f7b] hover:bg-[#011f7b]/20 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Biasa</button>
-                      <button onClick={() => addToCart(item, 1, '+ ½ Telur', 2000)} className="bg-[#FFBA09]/25 text-[#011f7b] hover:bg-[#FFBA09]/40 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">+ ½ Telur</button>
-                      <button onClick={() => addToCart(item, 1, '+ 1 Telur', 3000)} className="bg-[#FFBA09]/40 text-[#011f7b] hover:bg-[#FFBA09]/60 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">+ 1 Telur</button>
-                      <button onClick={() => addToCart(item, 1, 'Komplit', 5000)} className="bg-[#FFBA09] text-[#011f7b] hover:bg-[#e6a608] py-2 rounded-lg font-bold text-xs active:scale-95 transition-all shadow-sm">Komplit</button>
+                      <button onClick={() => addToCart(item, 1, '+ ½ Telur', 2000)} className="bg-[#011f7b]/20 text-[#011f7b] hover:bg-[#011f7b]/30 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">+ ½ Telur</button>
+                      <button onClick={() => addToCart(item, 1, '+ 1 Telur', 3000)} className="bg-[#011f7b]/30 text-[#011f7b] hover:bg-[#011f7b]/40 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">+ 1 Telur</button>
+                      <button onClick={() => addToCart(item, 1, 'Komplit', 5000)} className="bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-bold text-xs active:scale-95 transition-all shadow-sm">Komplit</button>
                     </div>
                   ) : item.name === 'Es Kelapa Muda' ? (
                     <div className="grid grid-cols-2 gap-1 lg:gap-2">
                       <button onClick={() => addToCart(item, 1, '(5K)', 0)} className="bg-[#011f7b]/10 text-[#011f7b] hover:bg-[#011f7b]/20 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Rp 5.000</button>
-                      <button onClick={() => addToCart(item, 1, '(7K)', 2000)} className="bg-[#FFBA09] text-[#011f7b] hover:bg-[#e6a608] py-2 rounded-lg font-bold text-xs active:scale-95 transition-all shadow-sm">Rp 7.000</button>
+                      <button onClick={() => addToCart(item, 1, '(7K)', 2000)} className="bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-bold text-xs active:scale-95 transition-all shadow-sm">Rp 7.000</button>
                     </div>
                   ) : item.name === 'Teh' ? (
                     <div className="grid grid-cols-2 gap-1 lg:gap-2">
                       <button onClick={() => addToCart(item, 1, 'Dingin', 0)} className="bg-[#011f7b]/10 text-[#011f7b] hover:bg-[#011f7b]/20 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Dingin</button>
-                      <button onClick={() => addToCart(item, 1, 'Hangat', 0)} className="bg-[#FFBA09]/40 text-[#011f7b] hover:bg-[#FFBA09]/60 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Hangat</button>
+                      <button onClick={() => addToCart(item, 1, 'Hangat', 0)} className="bg-[#011f7b]/20 text-[#011f7b] hover:bg-[#011f7b]/30 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Hangat</button>
                     </div>
                   ) : (
-                    <button onClick={() => addToCart(item, 1)} className="w-full bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-semibold text-xs lg:text-sm active:scale-95 transition-all shadow-sm">Pesan</button>
+                    <button onClick={() => addToCart(item, 1)} className="w-full bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-bold text-xs lg:text-sm active:scale-95 transition-all shadow-sm">Pesan</button>
                   )}
                 </div>
               </div>
@@ -413,7 +413,12 @@ export default function App() {
                       <span className="w-10 text-center font-bold text-sm text-[#011f7b]">{item.qty}</span>
                       <button onClick={() => tambahQty(item.cartId)} className="w-8 h-8 text-[#011f7b] hover:bg-[#011f7b] hover:text-white active:scale-90 transition-all font-bold">+</button>
                     </div>
-                    <button onClick={() => hapusItem(item.cartId)} className="text-xs font-bold text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-all active:scale-95">Hapus</button>
+                    <button 
+                      onClick={() => hapusItem(item.cartId)} 
+                      className="text-xs font-bold text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-all active:scale-95"
+                    >
+                      Hapus
+                    </button>
                   </div>
                 </div>
               ))
@@ -555,7 +560,7 @@ export default function App() {
                   />
                   <button 
                     onClick={handleTambahPengeluaran}
-                    className="flex-shrink-0 bg-[#011f7b] text-white hover:bg-[#FFBA09] hover:text-[#011f7b] px-4 py-2.5 rounded-lg text-sm font-bold active:scale-95 transition-all shadow-sm"
+                    className="flex-shrink-0 bg-[#011f7b] text-white hover:bg-[#01155a] px-4 py-2.5 rounded-lg text-sm font-bold active:scale-95 transition-all shadow-sm"
                   >
                     Add +
                   </button>
@@ -683,7 +688,7 @@ export default function App() {
                 onClick={() => setShowRekapModal(false)} 
                 className="bg-[#011f7b] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#FFBA09] hover:text-[#011f7b] transition-all active:scale-95 shadow-md"
               >
-                Tutup Papan
+                Tutup
               </button>
             </div>
             
