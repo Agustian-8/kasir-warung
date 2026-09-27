@@ -252,37 +252,44 @@ export default function App() {
   const bagikanLaporan = () => {
     const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
-    let teksMenuTerjual = rincianPenjualan.length > 0
-      ? rincianPenjualan.map(p => `- ${p.name} : ${p.qty}x`).join('\n')
-      : '- Belum ada penjualan hari ini';
+    // === GROUPING MENU TERJUAL (RANGKUMAN SAJA) ===
+    let teksMenuTerjual = '';
+    
+    if (arrayGroupedPenjualan.length > 0) {
+      teksMenuTerjual = arrayGroupedPenjualan
+        .map(group => `- ${group.namaDasar} ${group.totalQty}x : Rp ${group.totalUang.toLocaleString('id-ID')}`)
+        .join('\n');
+    } else {
+      teksMenuTerjual = '- Belum ada penjualan hari ini';
+    }
 
     let teksPengeluaran = rincianPengeluaran.length > 0 
       ? rincianPengeluaran.map(p => `- ${p.nama}: Rp ${p.nominal.toLocaleString('id-ID')}`).join('\n')
       : '- Tidak ada';
 
     const teksLaporan = 
-`*LAPORAN HARIAN WARUNG*
-${tanggal}
+  `*LAPORAN HARIAN WARUNG*
+  ${tanggal}
 
-*MENU TERJUAL HARI INI:*
-${teksMenuTerjual}
-━━━━━━━━━━━━━━━━━━
+  *MENU TERJUAL HARI INI:*
+  ${teksMenuTerjual}
+  ━━━━━━━━━━━━━━━━━━
 
-*TOTAL PENJUALAN* : Rp ${totalPenjualan.toLocaleString('id-ID')}
-*UANG DI LACI* : Rp ${displayUangLaci.toLocaleString('id-ID')}
-*SELISIH* : ${uangFisikLaci !== '' ? (selisihKas >= 0 ? '+ Rp ' + selisihKas.toLocaleString('id-ID') : '- Rp ' + Math.abs(selisihKas).toLocaleString('id-ID')) : 'Belum dihitung'}
+  *TOTAL PENJUALAN* : Rp ${totalPenjualan.toLocaleString('id-ID')}
+  *UANG DI LACI* : Rp ${displayUangLaci.toLocaleString('id-ID')}
+  *SELISIH* : ${uangFisikLaci !== '' ? (selisihKas >= 0 ? '+ Rp ' + selisihKas.toLocaleString('id-ID') : '- Rp ' + Math.abs(selisihKas).toLocaleString('id-ID')) : 'Belum dihitung'}
 
-*RINCIAN PENGELUARAN* :
-${teksPengeluaran}
-*TOTAL PENGELUARAN* : Rp ${totalPengeluaran.toLocaleString('id-ID')}
+  *RINCIAN PENGELUARAN* :
+  ${teksPengeluaran}
+  *TOTAL PENGELUARAN* : Rp ${totalPengeluaran.toLocaleString('id-ID')}
 
-━━━━━━━━━━━━━━━━━━
-*LABA BERSIH HARI INI*
-(Total Penjualan - Total Pengeluaran)
-*Rp ${keuntunganBersih.toLocaleString('id-ID')}*
-━━━━━━━━━━━━━━━━━━
+  ━━━━━━━━━━━━━━━━━━
+  *LABA BERSIH HARI INI*
+  (Total Penjualan - Total Pengeluaran)
+  *Rp ${keuntunganBersih.toLocaleString('id-ID')}*
+  ━━━━━━━━━━━━━━━━━━
 
-_Dibuat Oleh © Agustian._`;
+  _Dibuat Oleh © Agustian._`;
 
     const nomorWA = "6289514215508";
     const linkWA = `https://wa.me/${nomorWA}?text=${encodeURIComponent(teksLaporan)}`;
