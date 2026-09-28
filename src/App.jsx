@@ -322,8 +322,8 @@ _Dibuat Oleh © Agustian._`;
         {/* === AREA KIRI: KATALOG MENU === */}
         <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-md border border-[#011f7b]/10 overflow-hidden">
           
-          {/* === TAB KATEGORI (3 MENU TANPA ICON) === */}
-          <div className="flex overflow-x-auto p-3 gap-2 border-b border-[#011f7b]/10 bg-[#011f7b]/5 scrollbar-hide">
+          {/* === TAB KATEGORI (3 MENU FIXED, TIDAK BISA DI-SLIDE) === */}
+          <div className="grid grid-cols-3 gap-2 p-3 border-b border-[#011f7b]/10 bg-[#011f7b]/5">
             {[
               { key: 'food', label: 'Makanan' },
               { key: 'snack', label: 'Cemilan' },
@@ -332,7 +332,7 @@ _Dibuat Oleh © Agustian._`;
               <button 
                 key={kat.key}
                 onClick={() => setActiveKategori(kat.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all active:scale-95 ${
                   activeKategori === kat.key 
                     ? 'bg-[#011f7b] text-white shadow-md' 
                     : 'bg-white text-[#011f7b] border border-[#011f7b]/20 hover:border-[#011f7b] hover:bg-[#011f7b]/5'
