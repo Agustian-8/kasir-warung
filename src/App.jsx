@@ -322,7 +322,7 @@ _Dibuat Oleh © Agustian._`;
         {/* === AREA KIRI: KATALOG MENU === */}
         <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-md border border-[#011f7b]/10 overflow-hidden">
           
-          {/* === TAB KATEGORI (3 MENU FIXED, TIDAK BISA DI-SLIDE) === */}
+          {/* === TAB KATEGORI (3 MENU FIXED) === */}
           <div className="grid grid-cols-3 gap-2 p-3 border-b border-[#011f7b]/10 bg-[#011f7b]/5">
             {[
               { key: 'food', label: 'Makanan' },
@@ -375,6 +375,11 @@ _Dibuat Oleh © Agustian._`;
                     <div className="grid grid-cols-2 gap-1 lg:gap-2">
                       <button onClick={() => addToCart(item, 1, 'Dingin', 0)} className="bg-[#011f7b]/10 text-[#011f7b] hover:bg-[#011f7b]/20 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Dingin</button>
                       <button onClick={() => addToCart(item, 1, 'Hangat', 0)} className="bg-[#011f7b]/20 text-[#011f7b] hover:bg-[#011f7b]/30 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Hangat</button>
+                    </div>
+                  ) : item.name === 'Kopi' ? (
+                    <div className="grid grid-cols-2 gap-1 lg:gap-2">
+                      <button onClick={() => addToCart(item, 1, 'Hitam', 0)} className="bg-[#011f7b]/10 text-[#011f7b] hover:bg-[#011f7b]/20 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Hitam</button>
+                      <button onClick={() => addToCart(item, 1, 'Susu', 0)} className="bg-[#011f7b]/20 text-[#011f7b] hover:bg-[#011f7b]/30 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Susu</button>
                     </div>
                   ) : (
                     <button onClick={() => addToCart(item, 1)} className="w-full bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-bold text-xs lg:text-sm active:scale-95 transition-all shadow-sm">Pesan</button>
@@ -603,7 +608,7 @@ _Dibuat Oleh © Agustian._`;
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Tutup Buku (Reset Data)
+                Tutup Buku
               </button>
             </div>
           </div>
@@ -693,7 +698,7 @@ _Dibuat Oleh © Agustian._`;
                 onClick={() => setShowRekapModal(false)} 
                 className="bg-[#011f7b] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#FFBA09] hover:text-[#011f7b] transition-all active:scale-95 shadow-md"
               >
-                Tutup Papan
+                Tutup
               </button>
             </div>
             
