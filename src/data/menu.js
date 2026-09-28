@@ -9,8 +9,12 @@ export const menuItems = [
   { id: 8, name: 'Teh', price: 3000, type: 'drink' },
   { id: 9, name: 'Pop Ice', price: 5000, type: 'drink' },
   { id: 10, name: 'Es Creamy', price: 5000, type: 'drink' },
-  { id: 11, name: 'Nutrisari', price: 3000, type: 'drink' },
+  { id: 11, name: 'Marimas', price: 3000, type: 'drink' },
   { id: 12, name: 'Kopi', price: 5000, type: 'drink' },
   { id: 13, name: 'Es Tawar', price: 2000, type: 'drink' },
-  { id: 14, name: 'Es Kelapa Muda', price: 5000, type: 'drink' }
+  { id: 14, name: 'Es Kelapa Muda', price: 5000, type: 'drink' },
+  { id: 15, name: 'Susu Hangat', price: 3000, type: 'drink' },
+  { id: 16, name: 'Susu Dingin', price: 5000, type: 'drink' },
+  { id: 17, name: 'Teh Susu Hangat', price: 3000, type: 'drink' },
+  { id: 18, name: 'Teh Susu Dingin', price: 5000, type: 'drink' }
 ];

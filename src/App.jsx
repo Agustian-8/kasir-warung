@@ -252,7 +252,6 @@ export default function App() {
   const bagikanLaporan = () => {
     const tanggal = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
-    // === GROUPING MENU TERJUAL (RANGKUMAN SAJA) ===
     let teksMenuTerjual = '';
     
     if (arrayGroupedPenjualan.length > 0) {
