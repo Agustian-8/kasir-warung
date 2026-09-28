@@ -8,7 +8,7 @@ export default function App() {
     const savedCart = localStorage.getItem('kasir_cart_sementara');
     return savedCart ? JSON.parse(savedCart) : [];
   });
-  const [activeKategori, setActiveKategori] = useState('Semua');
+  const [activeKategori, setActiveKategori] = useState('food');
 
   // === STATE: DATA DATABASE ===
   const [totalPenjualan, setTotalPenjualan] = useState(0);
@@ -296,7 +296,8 @@ _Dibuat Oleh © Agustian._`;
     window.open(linkWA, '_blank');
   };
 
-  const menuTampil = activeKategori === 'Semua' ? menuItems : menuItems.filter(m => m.type === activeKategori);
+  // === FILTER MENU BERDASARKAN KATEGORI AKTIF ===
+  const menuTampil = menuItems.filter(m => m.type === activeKategori);
 
   return (
     <div className="min-h-screen bg-[#EFEEEA] text-[#011f7b] flex flex-col relative">
@@ -320,18 +321,24 @@ _Dibuat Oleh © Agustian._`;
         
         {/* === AREA KIRI: KATALOG MENU === */}
         <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-md border border-[#011f7b]/10 overflow-hidden">
+          
+          {/* === TAB KATEGORI (3 MENU TANPA ICON) === */}
           <div className="flex overflow-x-auto p-3 gap-2 border-b border-[#011f7b]/10 bg-[#011f7b]/5 scrollbar-hide">
-            {['Semua', 'food', 'snack', 'drink'].map(kat => (
+            {[
+              { key: 'food', label: 'Makanan' },
+              { key: 'snack', label: 'Cemilan' },
+              { key: 'drink', label: 'Minuman' },
+            ].map(kat => (
               <button 
-                key={kat}
-                onClick={() => setActiveKategori(kat)}
+                key={kat.key}
+                onClick={() => setActiveKategori(kat.key)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all active:scale-95 ${
-                  activeKategori === kat 
+                  activeKategori === kat.key 
                     ? 'bg-[#011f7b] text-white shadow-md' 
                     : 'bg-white text-[#011f7b] border border-[#011f7b]/20 hover:border-[#011f7b] hover:bg-[#011f7b]/5'
                 }`}
               >
-                {kat === 'food' ? 'Makanan' : kat === 'snack' ? 'Cemilan' : kat === 'drink' ? 'Minuman' : 'Semua'}
+                {kat.label}
               </button>
             ))}
           </div>
@@ -344,7 +351,10 @@ _Dibuat Oleh © Agustian._`;
               >
                 <div className="mb-3">
                   <h3 className="font-bold text-[#011f7b] text-sm lg:text-base leading-tight">{item.name}</h3>
-                  <p className="text-[#011f7b] font-bold text-sm mt-1">Rp {item.price.toLocaleString('id-ID')}</p>
+                  {/* Harga hanya ditampilkan untuk snack & drink, TIDAK untuk food */}
+                  {item.type !== 'food' && (
+                    <p className="text-[#011f7b] font-bold text-sm mt-1">Rp {item.price.toLocaleString('id-ID')}</p>
+                  )}
                 </div>
 
                 <div className="mt-auto">
@@ -360,11 +370,6 @@ _Dibuat Oleh © Agustian._`;
                       <button onClick={() => addToCart(item, 1, '+ ½ Telur', 2000)} className="bg-[#011f7b]/20 text-[#011f7b] hover:bg-[#011f7b]/30 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">+ ½ Telur</button>
                       <button onClick={() => addToCart(item, 1, '+ 1 Telur', 3000)} className="bg-[#011f7b]/30 text-[#011f7b] hover:bg-[#011f7b]/40 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">+ 1 Telur</button>
                       <button onClick={() => addToCart(item, 1, 'Komplit', 5000)} className="bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-bold text-xs active:scale-95 transition-all shadow-sm">Komplit</button>
-                    </div>
-                  ) : item.name === 'Es Kelapa Muda' ? (
-                    <div className="grid grid-cols-2 gap-1 lg:gap-2">
-                      <button onClick={() => addToCart(item, 1, '(5K)', 0)} className="bg-[#011f7b]/10 text-[#011f7b] hover:bg-[#011f7b]/20 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-all">Rp 5.000</button>
-                      <button onClick={() => addToCart(item, 1, '(7K)', 2000)} className="bg-[#011f7b] text-white hover:bg-[#01155a] py-2 rounded-lg font-bold text-xs active:scale-95 transition-all shadow-sm">Rp 7.000</button>
                     </div>
                   ) : item.name === 'Teh' ? (
                     <div className="grid grid-cols-2 gap-1 lg:gap-2">
@@ -598,7 +603,7 @@ _Dibuat Oleh © Agustian._`;
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Tutup Buku
+                Tutup Buku (Reset Data)
               </button>
             </div>
           </div>
@@ -688,7 +693,7 @@ _Dibuat Oleh © Agustian._`;
                 onClick={() => setShowRekapModal(false)} 
                 className="bg-[#011f7b] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#FFBA09] hover:text-[#011f7b] transition-all active:scale-95 shadow-md"
               >
-                Tutup
+                Tutup Papan
               </button>
             </div>
             
