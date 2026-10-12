@@ -16,5 +16,6 @@ export const menuItems = [
   { id: 15, name: 'Susu Hangat', price: 3000, type: 'drink' },
   { id: 16, name: 'Susu Dingin', price: 5000, type: 'drink' },
   { id: 17, name: 'Teh Susu Hangat', price: 3000, type: 'drink' },
-  { id: 18, name: 'Teh Susu Dingin', price: 5000, type: 'drink' }
+  { id: 18, name: 'Teh Susu Dingin', price: 5000, type: 'drink' },
+  { id: 19, name: 'Telur Rebus', price: 3000, type: 'snack' }
 ];
